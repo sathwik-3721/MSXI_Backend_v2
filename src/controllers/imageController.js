@@ -112,16 +112,18 @@ const processClaimDocuments = async (req, res) => {
         console.log("analyzedText", analyzedText);
         const claimDate = analyzedText["Claim Date"];
         const itemCovered = analyzedText["Items Covered"];
-        const claimID = analyzedText["Claim Number"];
+        const claimID = analyzedText["Claim Number"].replace(/\s+/g, ''); // Remove spaces from claimID
         const aiStatus = analyzedText["Claim Status"];  // Assuming Claim Status is derived from analyzedText
   
         // Generate a unique ID for this upload (PDF + images)
         const uploadId = claimID;
+        console.log("UploadID:", uploadId);
   
         // Step 2: Upload PDF to GCS
         const pdfFileName = `${uploadId}/pdfs/${pdfFile.originalname}`;
         const pdfFileUpload = storage.bucket(bucketName).file(pdfFileName);
         await pdfFileUpload.save(pdfFile.buffer);
+        const pdfUrl = `https://storage.googleapis.com/${bucketName}/${pdfFileName}`;
   
         // Step 3: Process and upload each image to GCS
         const imageResults = [];
@@ -133,6 +135,7 @@ const processClaimDocuments = async (req, res) => {
             const imageFileName = `${uploadId}/images/${image.originalname}`;
             const imageFileUpload = storage.bucket(bucketName).file(imageFileName);
             await imageFileUpload.save(image.buffer);
+            const imageUrl = `https://storage.googleapis.com/${bucketName}/${imageFileName}`;
   
             const imageMetadata = {
                 imageName: image.originalname,
@@ -140,7 +143,7 @@ const processClaimDocuments = async (req, res) => {
                 imageBuffer: image.buffer,
                 imageDate: formattedDate,
                 validationMessage: validationMessage,
-                gcsPath: `gs://${bucketName}/${imageFileName}`,
+                gcsPath: imageUrl,
             };
   
             imageMetadataArray.push(imageMetadata);
@@ -165,7 +168,6 @@ const processClaimDocuments = async (req, res) => {
         }
   
         // Step 5: Store URLs and statuses in the database
-        const pdfUrl = `gs://${bucketName}/${pdfFileName}`;
         const imageUrlList = imageMetadataArray.map(image => image.gcsPath);
   
         const connection = await pool.getConnection();
