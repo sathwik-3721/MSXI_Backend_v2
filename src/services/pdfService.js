@@ -33,6 +33,7 @@ const analyzeText = async(fileContent) => {
     }
   
     const claimantPrompt = `Analyze the following text and extract the following information in JSON format:
+          - Claim Number: The claim number like Id of the claim
           - Name: The full name of the customer
           - Vehicle Info: Details about the vehicle involved
           - Claim Status: The current status of the claim, which should be one of "Approved", "Rejected", or "Pending"
@@ -44,6 +45,7 @@ const analyzeText = async(fileContent) => {
           ${fileText}`;
   
     const dealerPrompt = `Analyze the following text and extract the following information in JSON format:
+          - Claim Number: The claim number like Id of the claim
           - Name: The full name of the dealer
           - Location: The address of the dealership
           - Claim Status: The current status of the claim, which should be one of "Approved", "Rejected", or "Pending"
@@ -55,6 +57,7 @@ const analyzeText = async(fileContent) => {
           ${fileText}`;
   
     const serviceCenterPrompt = `Analyze the following text and extract the following information in JSON format:
+          - Claim Number: The claim number like Id of the claim
           - Name: The name of the service center
           - Location: The location of the service center
           - Claim Status: The current status of the claim, which should be one of "Approved", "Rejected", or "Pending"

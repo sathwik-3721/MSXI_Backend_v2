@@ -110,9 +110,10 @@ const processClaimDocuments = async (req, res) => {
       console.log("analyzedText", analyzedText);
       const claimDate = analyzedText["Claim Date"];
       const itemCovered = analyzedText["Items Covered"];
+      const claimID = analyzedText["Claim Number"];
   
       // Generate a unique ID for this upload (PDF + images)
-      const uploadId = Date.now().toString();
+      const uploadId = claimID;
   
       // Step 2: Upload PDF to GCS
       const pdfFileName = `${uploadId}/pdfs/${pdfFile.originalname}`;
@@ -178,6 +179,6 @@ const processClaimDocuments = async (req, res) => {
         message: "An error occurred while processing the claim documents.",
       });
     }
-  };
+};
 
 module.exports = { analyzeImage, verifyMetadata, processClaimDocuments };
