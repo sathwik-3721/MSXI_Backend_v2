@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const pdfRoutes = require('./src/routes/pdfRoutes');
 const imageRoutes = require('./src/routes/imageRoutes');
+const folderRoutes = require('./src/routes/folderRoutes');
 
 dotenv.config();
 
@@ -13,6 +14,7 @@ app.use(cors());
 // import routes
 app.use('/pdf', pdfRoutes);
 app.use('/image', imageRoutes);
+app.use('/delete', folderRoutes);
 
 app.listen(3002, "0.0.0.0", () => {
     console.log(`Server is running on http://0.0.0.0:3002`);
