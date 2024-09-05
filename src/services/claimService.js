@@ -1,40 +1,60 @@
 const pool = require('../config/db');
 
-const getClaims = async () => {
+const getClaimsByID = async (claim_id) => {
     const connection = await pool.getConnection();
-    console.log("conn", connection);
 
     try {
-        // Query to get the claim ID, PDF URL, and image URL
-        const [rows] = await connection.query(`
+        console.log("claim id :", claim_id);
+        // Query to get claim details from the Claim_table
+        const [claimRows] = await connection.query(`
             SELECT 
-                c.claimID as id,
-                p.pdf_url as pdfURL,
-                i.image_url as imageURL
+                c.claimID as id
             FROM 
                 Claim_table c
-            LEFT JOIN 
-                PDF_table p ON c.claimID = p.claimID
-            LEFT JOIN 
-                Image_table i ON c.claimID = i.claimID;
-        `);
-        // console.log("rows", rows);
+            WHERE 
+                c.claimID = ?;`, [claim_id]);
 
-        // Format the results into the desired JSON structure
-        const claims = rows.map(row => ({
-            id: row.id,
-            pdfURL: row.pdfURL,
-            imageURL: row.imageURL
-        }));
-
-        console.log("claims ", claims);
-
-        // Return claims if not empty, otherwise return a message
-        if (claims.length === 0) {
-            return { message: 'No claims found.' };
+        // If no rows are returned from Claim_table, return a message indicating no claims found
+        if (claimRows.length === 0) {
+            return { message: `No claims found for claimID: ${claim_id}` };
         }
 
-        return claims;
+        const claim = claimRows[0];
+        const claimID = claim.id;
+
+        // Query to get PDF details for the specified claimID
+        const [pdfRows] = await connection.query(`
+            SELECT 
+                p.pdf_url as pdfURL,
+                p.pdf_description as pdfDesc
+            FROM 
+                PDF_table p
+            WHERE 
+                p.claimID = ?;`, [claimID]);
+
+        // Query to get Image details for the specified claimID
+        const [imageRows] = await connection.query(`
+            SELECT 
+                i.image_url as imageURL,
+                i.image_status as imageStatus
+            FROM 
+                Image_table i
+            WHERE 
+                i.claimID = ?;`, [claimID]);
+
+        // Combine the results
+        const claimDetails = {
+            id: claimID,
+            pdfURL: pdfRows.length > 0 ? pdfRows[0].pdfURL : null,
+            pdfDesc: pdfRows.length > 0 ? pdfRows[0].pdfDesc : null,
+            imageURL: imageRows.map(row => row.imageURL),
+            imageStatus: imageRows.map(row => row.imageStatus)
+        };
+
+        console.log("claimDetails ", claimDetails);
+
+        // Return the combined claim details
+        return claimDetails;
     } catch (error) {
         console.error('Error fetching claims:', error.message);
         throw new Error('Error fetching claims.');
@@ -42,6 +62,7 @@ const getClaims = async () => {
         connection.release();
     }
 };
+
 
 const getClaimIDs = async () => {
     const connection = await pool.getConnection();
@@ -99,4 +120,4 @@ const updateClaimStatus = async (claimID, status) => {
     }
 };
 
-module.exports = { getClaims, getClaimIDs, updateClaimStatus };
+module.exports = { getClaimsByID, getClaimIDs, updateClaimStatus };
