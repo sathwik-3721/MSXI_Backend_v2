@@ -104,9 +104,11 @@ const processClaimDocuments = async (req, res) => {
             return res.status(400).send("Please upload both PDF and images.");
         }
 
-        // Return "OK submitted" response immediately
-        res.status(200).send({ message: "OK submitted" });
-
+        // Return "OK submitted" response after 5 seconds
+        setTimeout(() => {
+            res.status(200).send({ message: "Files have been sucessfully uploaded and being processed in background" });
+        }, 5000);
+        
         // Run the processing in the background
         setImmediate(async () => {
             try {
@@ -171,7 +173,7 @@ const processClaimDocuments = async (req, res) => {
                 const imageUrlList = imageMetadataArray.map(image => image.gcsPath);
 
                 // Call the utility function for database transactions
-                await processTransaction(claimID, pdfUrl, imageUrlList, aiStatus);
+                await processTransaction(claimID, pdfUrl, imageUrlList, aiStatus, analyzedText, analysisResults);
 
                 // Combined results (you can store this in logs or a database if needed)
                 const combinedResults = {

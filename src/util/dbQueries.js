@@ -38,26 +38,39 @@ const insertClaimStatus = async (claimID, aiStatus) => {
 };
 
 // Function to handle the entire database transaction
-const processTransaction = async (claimID, pdfUrl, imageUrlList, aiStatus) => {
+const processTransaction = async (claimID, pdfUrl, imageUrlList, aiStatus, analyzedText, analysisResults) => {
     const connection = await pool.getConnection();
     try {
         console.log("Started adding to table");
         await connection.beginTransaction();
 
-        // Insert PDF
-        await insertPdf(claimID, pdfUrl);
+        // Step 1: Insert PDF URL and pdf_description (reason) into PDF table
+        await connection.query(
+            'INSERT INTO PDF_table (claimID, pdf_url, pdf_description) VALUES (?, ?, ?)',
+            [claimID, pdfUrl, analyzedText["Reason"]]
+        );
 
-        // Insert each image URL
-        await insertImages(claimID, imageUrlList);
+        // Step 2: Insert each image URL, image_status, image_description, and reason into Image table
+        for (const [index, imageUrl] of imageUrlList.entries()) {
+            const analysisResult = analysisResults[index]; // Get the corresponding analysis result
+            console.log("Analysis result:", analysisResult);
+            await connection.query(
+                'INSERT INTO Image_table (claimID, image_url, image_status, image_description) VALUES (?, ?, ?, ?)',
+                [claimID, imageUrl, analysisResult.analysisResult['Claim Status'].status, analysisResult.analysisResult['Evidence Content']]
+            );
+        }
 
-        // Insert claim status and AI-status
-        await insertClaimStatus(claimID, aiStatus);
+        // Step 3: Insert claim status and AI-status into Claim table
+        await connection.query(
+            'INSERT INTO Claim_table (claimID, status, ai_status) VALUES (?, ?, ?)',
+            [claimID, null, aiStatus]
+        );
 
         await connection.commit();
-        console.log("Transaction committed successfully");
+        console.log("Finished adding into table");
     } catch (error) {
         await connection.rollback();
-        console.error("Transaction failed, rolled back", error);
+        console.error("Transaction failed: ", error);
         throw error;
     } finally {
         connection.release();
