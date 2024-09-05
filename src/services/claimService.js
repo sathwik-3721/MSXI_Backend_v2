@@ -32,11 +32,12 @@ const getClaimsByID = async (claim_id) => {
             WHERE 
                 p.claimID = ?;`, [claimID]);
 
-        // Query to get Image details for the specified claimID
+        // Query to get Image details for the specified claimID, including image description
         const [imageRows] = await connection.query(`
             SELECT 
                 i.image_url as imageURL,
-                i.image_status as imageStatus
+                i.image_status as imageStatus,
+                i.image_description as imageDesc
             FROM 
                 Image_table i
             WHERE 
@@ -48,7 +49,8 @@ const getClaimsByID = async (claim_id) => {
             pdfURL: pdfRows.length > 0 ? pdfRows[0].pdfURL : null,
             pdfDesc: pdfRows.length > 0 ? pdfRows[0].pdfDesc : null,
             imageURL: imageRows.map(row => row.imageURL),
-            imageStatus: imageRows.map(row => row.imageStatus)
+            imageStatus: imageRows.map(row => row.imageStatus),
+            imageDesc: imageRows.map(row => row.imageDesc)  // Include image descriptions
         };
 
         console.log("claimDetails ", claimDetails);

@@ -2,7 +2,7 @@ const { getClaimsByID, getClaimIDs, updateClaimStatus   } = require('../services
 
 const getClaimsHandler = async (req, res) => {
     try {
-        const claim_id = req.body.claimID;
+        const claim_id = req.params.claimID;
         const claims = await getClaimsByID(claim_id);
 
         // Check if the response contains a message indicating no claims were found

@@ -34,7 +34,7 @@ const analyzeImageContent = async (imageBuffer, itemCovered) => {
                     {
                         text: `Analyze the image and tell me what object it contains. I will also give you an object name to check for a match. Please provide the output in the JSON format for easy accessing and slicing:
                               "ObjectName": "Expected object name",
-                              "AnalyzedImageDescription": "A brief description of what the image contains",
+                              "AnalyzedImageDescription": "A brief description of what the image contains. Like what objects are there in the image given to you irrespective to itemcovered",
                               "MatchingPercentage": "Matching percentage as a number without the % symbol"
                           The object name to check is ${itemCovered}.`,
                     },
@@ -92,7 +92,7 @@ const analyzeImageContent = async (imageBuffer, itemCovered) => {
 
         return {
             "Damaged Component": parsedJson["ObjectName"],
-            "Evidence Content": parsedJson["AnalyzedImageDescription"],
+            "Evidence Content": parsedJson["AnalyzedImageDescription"] || parsedJson["AnalyzedImage Description"] || parsedJson[" AnalyzedImageDescription"],
             "Matching percentage": matchingPercentage,
             "Evidence Relevance": matchingPercentage > 80 ? "Relevant" : "Irrelevant",
             "Claim Status": claimStatus,
