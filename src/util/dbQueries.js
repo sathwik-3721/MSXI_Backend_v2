@@ -1,82 +1,124 @@
-const pool = require('../config/db'); // Importing the database connection
+require('dotenv').config();
+const sql = require('mssql');
+const poolPromise = require('../config/db'); // Import the database connection
 
 // Function to insert PDF URL into PDF table
-const insertPdf = async (claimID, pdfUrl) => {
-    const query = 'INSERT INTO PDF_table (claimID, pdf_url) VALUES (?, ?)';
-    const params = [claimID, pdfUrl];
-    const connection = await pool.getConnection();
+const insertPdf = async (claimID, pdfUrl, pdfDescription) => {
     try {
-        await connection.query(query, params);
-    } finally {
-        connection.release();
+        const pool = await poolPromise; // Await the pool promise
+        const query = 'INSERT INTO PDF_table (claimID, pdf_url, pdf_description) VALUES (@claimID, @pdfUrl, @pdfDescription)';
+        await pool.request()
+            .input('claimID', sql.VarChar, claimID)
+            .input('pdfUrl', sql.VarChar, pdfUrl)
+            .input('pdfDescription', sql.VarChar, pdfDescription)
+            .query(query);
+        console.log(`PDF entry created for Claim ID: ${claimID}`);
+    } catch (err) {
+        console.error('Error inserting PDF: ', err);
+        throw err;
     }
 };
 
 // Function to insert image URLs into Image table
-const insertImages = async (claimID, imageUrlList) => {
-    const query = 'INSERT INTO Image_table (claimID, image_url) VALUES (?, ?)';
-    const connection = await pool.getConnection();
+const insertImages = async (claimID, imageUrlList, analysisResults) => {
     try {
-        for (const imageUrl of imageUrlList) {
-            await connection.query(query, [claimID, imageUrl]);
+        const pool = await poolPromise;
+        const query = 'INSERT INTO Image_table (claimID, image_url, image_status, image_description) VALUES (@claimID, @imageUrl, @imageStatus, @imageDescription)';
+
+        for (const [index, imageUrl] of imageUrlList.entries()) {
+            const analysisResult = analysisResults[index];
+            await pool.request()
+                .input('claimID', sql.VarChar, claimID)
+                .input('imageUrl', sql.VarChar, imageUrl)
+                .input('imageStatus', sql.VarChar, analysisResult.analysisResult['Claim Status'].status)
+                .input('imageDescription', sql.VarChar, analysisResult.analysisResult['Evidence Content'])
+                .query(query);
         }
-    } finally {
-        connection.release();
+        console.log(`Image entries created for Claim ID: ${claimID}`);
+    } catch (err) {
+        console.error('Error inserting images: ', err);
+        throw err;
     }
 };
 
 // Function to insert claim status and AI-status into Claim table
 const insertClaimStatus = async (claimID, aiStatus) => {
-    const query = 'INSERT INTO Claim_table (claimID, status, ai_status) VALUES (?, ?, ?)';
-    const params = [claimID, null, aiStatus];
-    const connection = await pool.getConnection();
     try {
-        await connection.query(query, params);
-    } finally {
-        connection.release();
+        const pool = await poolPromise;
+        const query = 'INSERT INTO Claim_table (claimID, status, ai_status) VALUES (@claimID, @status, @aiStatus)';
+        await pool.request()
+            .input('claimID', sql.VarChar, claimID)
+            .input('status', sql.VarChar, null)  // Assuming status is null initially
+            .input('aiStatus', sql.VarChar, aiStatus)
+            .query(query);
+        console.log(`Claim status created for Claim ID: ${claimID}`);
+    } catch (err) {
+        console.error('Error inserting claim status: ', err);
+        throw err;
     }
 };
 
 // Function to handle the entire database transaction
 const processTransaction = async (claimID, pdfUrl, imageUrlList, aiStatus, analyzedText, analysisResults) => {
-    const connection = await pool.getConnection();
+    let transaction;
     try {
-        console.log("Started adding to table");
-        await connection.beginTransaction();
+        // Wait for the connection pool to be ready
+        const pool = await poolPromise;
 
-        // Step 1: Insert PDF URL and pdf_description (reason) into PDF table
-        await connection.query(
-            'INSERT INTO PDF_table (claimID, pdf_url, pdf_description) VALUES (?, ?, ?)',
-            [claimID, pdfUrl, analyzedText["Reason"]]
-        );
+        // Start a transaction
+        transaction = new sql.Transaction(pool);
+        await transaction.begin();
 
-        // Step 2: Insert each image URL, image_status, image_description, and reason into Image table
+        const request = new sql.Request(transaction);
+
+        // Step 1: Insert PDF URL and pdf_description into PDF table
+        await request
+            .input('claimID', sql.VarChar, claimID)
+            .input('pdfUrl', sql.VarChar, pdfUrl)
+            .input('pdfDescription', sql.VarChar, analyzedText["Reason"])  // Using analyzed text's reason
+            .query('INSERT INTO PDF_table (claimID, pdf_url, pdf_description) VALUES (@claimID, @pdfUrl, @pdfDescription)');
+
+        // Clear parameters to avoid duplicates
+        request.parameters = {}; 
+
+        // Step 2: Insert each image URL, image_status, and image_description
         for (const [index, imageUrl] of imageUrlList.entries()) {
-            const analysisResult = analysisResults[index]; // Get the corresponding analysis result
-            console.log("Analysis result:", analysisResult);
-            await connection.query(
-                'INSERT INTO Image_table (claimID, image_url, image_status, image_description) VALUES (?, ?, ?, ?)',
-                [claimID, imageUrl, analysisResult.analysisResult['Claim Status'].status, analysisResult.analysisResult['Evidence Content']]
-            );
+            const analysisResult = analysisResults[index];
+
+            await request
+                .input('claimID', sql.VarChar, claimID)
+                .input('imageUrl', sql.VarChar, imageUrl)
+                .input('imageStatus', sql.VarChar, analysisResult.analysisResult['Claim Status'].status)
+                .input('imageDescription', sql.VarChar, analysisResult.analysisResult['Evidence Content'])
+                .query('INSERT INTO Image_table (claimID, image_url, image_status, image_description) VALUES (@claimID, @imageUrl, @imageStatus, @imageDescription)');
+
+            // Clear parameters for each image insert to avoid duplicates
+            request.parameters = {};
         }
 
         // Step 3: Insert claim status and AI-status into Claim table
-        await connection.query(
-            'INSERT INTO Claim_table (claimID, status, ai_status) VALUES (?, ?, ?)',
-            [claimID, null, aiStatus]
-        );
+        await request
+            .input('claimID', sql.VarChar, claimID)
+            .input('status', sql.VarChar, null)  // Assuming status is initially null
+            .input('aiStatus', sql.VarChar, aiStatus)
+            .query('INSERT INTO Claim_table (claimID, status, ai_status) VALUES (@claimID, @status, @aiStatus)');
 
-        await connection.commit();
-        console.log("Finished adding into table");
+        // Commit the transaction if all queries succeed
+        await transaction.commit();
+        console.log("Transaction committed successfully for Claim ID:", claimID);
     } catch (error) {
-        await connection.rollback();
+        // If there's an error, roll back the transaction
+        if (transaction) {
+            await transaction.rollback();
+        }
         console.error("Transaction failed: ", error);
         throw error;
-    } finally {
-        connection.release();
     }
 };
 
 module.exports = {
+    insertPdf,
+    insertImages,
+    insertClaimStatus,
     processTransaction,
 };

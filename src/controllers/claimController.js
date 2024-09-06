@@ -33,7 +33,7 @@ const getClaimIDsHandler = async (req, res) => {
 
 const updateClaimStatusHandler = async (req, res) => {
     const { claimID, status } = req.body;
-
+    
     // Validate the input
     if (!claimID || !status) {
         return res.status(400).json({ message: 'Claim ID and status are required.' });

@@ -19,6 +19,7 @@
     "exifreader": "^4.23.3",
     "express": "^4.19.2",
     "i": "^0.3.7",
+    "msnodesqlv8": "^4.2.1",
     "mssql": "^11.0.1",
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.11.0",
