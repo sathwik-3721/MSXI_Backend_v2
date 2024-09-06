@@ -1,5 +1,6 @@
 const { Storage } = require('@google-cloud/storage');
-const pool = require('../config/db') // Import the dbConfig
+const sql = require('mssql'); // Import the mssql package
+const poolPromise = require('../config/db'); // Import the MSSQL connection pool
 const storage = new Storage();
 require('dotenv').config();
 
@@ -20,26 +21,29 @@ const deleteFolderFromBucket = async (claimID) => {
 };
 
 const deleteRecordsFromTables = async (claimID) => {
-    const connection = await pool.getConnection(); // Get a connection from the pool
+    const pool = await poolPromise; // Get a pool instance
+
+    const transaction = new sql.Transaction(pool);
 
     try {
-        await connection.beginTransaction();
+        await transaction.begin();
 
         // Delete from PDF_table
-        await connection.query('DELETE FROM PDF_table WHERE claimID = ?', [claimID]);
+        await transaction.request().input('claimID', sql.VarChar, claimID)
+            .query('DELETE FROM PDF_table WHERE claimID = @claimID');
 
         // Delete from Image_table
-        await connection.query('DELETE FROM Image_table WHERE claimID = ?', [claimID]);
+        await transaction.request().input('claimID', sql.VarChar, claimID)
+            .query('DELETE FROM Image_table WHERE claimID = @claimID');
 
         // Delete from Claim_table
-        await connection.query('DELETE FROM Claim_table WHERE claimID = ?', [claimID]);
+        await transaction.request().input('claimID', sql.VarChar, claimID)
+            .query('DELETE FROM Claim_table WHERE claimID = @claimID');
 
-        await connection.commit();
+        await transaction.commit();
     } catch (error) {
-        await connection.rollback();
+        await transaction.rollback();
         throw new Error('Error deleting records from tables: ' + error.message);
-    } finally {
-        connection.release(); // Release the connection back to the pool
     }
 };
 
@@ -49,3 +53,4 @@ const deleteFolderAndRecords = async (claimID) => {
 };
 
 module.exports = { deleteFolderAndRecords };
+    

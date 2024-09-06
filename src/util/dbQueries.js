@@ -75,7 +75,7 @@ const processTransaction = async (claimID, pdfUrl, imageUrlList, aiStatus, analy
         await request
             .input('claimID', sql.VarChar, claimID)
             .input('pdfUrl', sql.VarChar, pdfUrl)
-            .input('pdfDescription', sql.VarChar, analyzedText["Reason"])  // Using analyzed text's reason
+            .input('pdfDescription', sql.VarChar, analyzedText["Reason "] || analyzedText["Reason"])  // Using analyzed text's reason
             .query('INSERT INTO PDF_table (claimID, pdf_url, pdf_description) VALUES (@claimID, @pdfUrl, @pdfDescription)');
 
         // Clear parameters to avoid duplicates
@@ -116,9 +116,39 @@ const processTransaction = async (claimID, pdfUrl, imageUrlList, aiStatus, analy
     }
 };
 
+const getPDFDescription = async (claimID) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('claimID', sql.VarChar, claimID)
+            .query('SELECT pdf_description FROM PDF_table WHERE claimID = @claimID');
+        return result.recordset[0] || null;
+    } catch (error) {
+        console.error("Error fetching PDF description:", error.message);
+        throw error;
+    }
+};
+
+// Helper function to get image descriptions from database
+const getImageDescriptions = async (claimID) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('claimID', sql.VarChar, claimID)
+            .query('SELECT image_description FROM Image_table WHERE claimID = @claimID');
+        return result;
+    } catch (error) {
+        console.error("Error fetching image descriptions:", error.message);
+        throw error;
+    }
+};
+
 module.exports = {
     insertPdf,
     insertImages,
     insertClaimStatus,
     processTransaction,
+    getPDFDescription,
+    getImageDescriptions
+
 };

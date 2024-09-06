@@ -1,6 +1,8 @@
 const ExifReader = require("exifreader");
 const axios = require("axios");
 const { formatDate, isValidClaimDate } = require("../util/helper");
+const { getPDFDescription, getImageDescriptions } = require('../util/dbQueries'); // Adjust path as needed
+
 
 const extractExifData = (buffer, claimDate) => {
   const tags = ExifReader.load(buffer);
@@ -103,5 +105,66 @@ const analyzeImageContent = async (imageBuffer, itemCovered) => {
     }
 };
   
+const aiSuggestion = async (claimID) => {
+    try {
+        // Get PDF description
+        const pdfDescResult = await getPDFDescription(claimID);
+        const pdfDescription = pdfDescResult ? pdfDescResult.pdf_description : "No PDF description available";
 
-module.exports = { analyzeImageContent, extractExifData };
+        // Get image descriptions
+        const imageDescriptions = await getImageDescriptions(claimID);
+        console.log("imagedescriptions", imageDescriptions);
+
+        // Convert image descriptions to a formatted string
+        // const formattedImageDescriptions = imageDescriptions.map(desc => 
+        //     `Image Name: ${desc.imageName}, Description: ${desc.image_description}`
+        // ).join('\n');
+
+        // Prepare data for `miraAI` API
+        const data = JSON.stringify({
+            contents: {
+                role: "user",
+                parts: [
+                    {
+                        text: `You are an expert in analyzing the given PDF description and image descriptions.
+                               Your task is to analyze the given PDF description and image descriptions and provide a result in the format below.
+                               AI Suggestion: Accept, Reject, or Pending (if further evidence is needed)
+                               PDF Description is: ${pdfDescription}
+                               Image Descriptions: ${imageDescriptions}`
+                    }
+                ]
+            }
+        });
+
+        const config = {
+            method: "post",
+            maxBodyLength: Infinity,
+            url: process.env.MIRA_AI_URL,
+            headers: {
+                model: process.env.MIRA_AI_MODEL,
+                "access-key": process.env.MIRA_AI_ACCESS_KEY,
+                "Content-Type": "application/json",
+            },
+            data: data,
+        };
+
+        // Send request to `miraAI` API
+        const response = await axios.request(config);
+
+        // Process the API response
+        const aiSuggestionResult = response.data;
+        const suggestion = aiSuggestionResult.suggestion; // Adjust based on actual response structure
+
+        // Return AI suggestion result
+        return {
+            claimID: claimID,
+            aiSuggestion: suggestion
+        };
+
+    } catch (error) {
+        console.error("Error in aiSuggestion:", error.message);
+        throw new Error("Error processing AI suggestion.");
+    }
+};
+
+module.exports = { analyzeImageContent, extractExifData, aiSuggestion };
