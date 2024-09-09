@@ -115,11 +115,6 @@ const aiSuggestion = async (claimID) => {
         const imageDescriptions = await getImageDescriptions(claimID);
         console.log("imagedescriptions", imageDescriptions);
 
-        // Convert image descriptions to a formatted string
-        // const formattedImageDescriptions = imageDescriptions.map(desc => 
-        //     `Image Name: ${desc.imageName}, Description: ${desc.image_description}`
-        // ).join('\n');
-
         // Prepare data for `miraAI` API
         const data = JSON.stringify({
             contents: {
