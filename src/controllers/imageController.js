@@ -1,7 +1,7 @@
 const { extractExifData, analyzeImageContent, aiSuggestion } = require("../services/imageService");
-const { extractText, analyzeText } = require("../services/pdfService");
 const { Storage } = require('@google-cloud/storage');
 const { processTransaction } = require('../util/dbQueries'); // Adjust the path accordingly
+const { extractText, analyzeText } = require('../services/pdfService.js')
 const path = require('path');
 require('dotenv').config();
 
@@ -9,8 +9,8 @@ const bucketName = process.env.BUCKET_NAME;
 
 // Initialize Google Cloud Storage
 const storage = new Storage({
-  projectId: process.env.PROJECT_ID,
-  keyFilename: path.join(__dirname, '../../service_account.json'),
+    projectId: process.env.PROJECT_ID,
+    keyFilename: path.join(__dirname, '../../service_account.json'),
 });
 
 const processClaimDocuments = async (req, res) => {
@@ -27,7 +27,7 @@ const processClaimDocuments = async (req, res) => {
         setTimeout(() => {
             res.status(200).send({ message: "Files have been sucessfully uploaded and being processed in background" });
         }, 5000);
-        
+
         // Run the processing in the background
         setImmediate(async () => {
             try {
@@ -86,7 +86,7 @@ const processClaimDocuments = async (req, res) => {
                         analysisResult,
                         gcsPath: imageMetadata.gcsPath,
                     });
-                }
+                } 
 
                 // Step 5: Store URLs and statuses in the database
                 const imageUrlList = imageMetadataArray.map(image => image.gcsPath);
@@ -108,7 +108,7 @@ const processClaimDocuments = async (req, res) => {
                 console.log("Processing completed for Claim ID:", claimID);
 
                 const aiSuggestionResult = await aiSuggestion(claimID);
-                console.log("AI SUggestion", aiSuggestionResult);
+                console.log("AI Suggestion", aiSuggestionResult);
             } catch (error) {
                 console.error("Error processing claim documents in background:", error.message);
             }

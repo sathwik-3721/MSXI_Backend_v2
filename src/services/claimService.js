@@ -5,83 +5,67 @@ const poolPromise = require('../config/db'); // Import the database connection
 const getClaimsByID = async (claim_id) => {
     try {
         const pool = await poolPromise; // Await the pool promise
-        
-        // Query to get claim details from the Claim_table
-        const claimQuery = `
+
+        // Optimized SQL query to fetch claim, PDF, and image details in one go
+        const query = `
             SELECT 
-                c.claimID as id
-            FROM 
-                Claim_table c
-            WHERE 
-                c.claimID = @claimID;
-        `;
-        const claimResult = await pool.request()
-            .input('claimID', sql.VarChar, claim_id)
-            .query(claimQuery);
-
-        // If no rows are returned from Claim_table, return a message indicating no claims found
-        if (claimResult.recordset.length === 0) {
-            return { message: `No claims found for claimID: ${claim_id}` };
-        }
-
-        const claim = claimResult.recordset[0];
-        const claimID = claim.id;
-
-        // Query to get PDF details for the specified claimID
-        const pdfQuery = `
-            SELECT 
+                c.claimID as id,
+                c.ai_status as aiStatus,
                 p.pdf_url as pdfURL,
-                p.pdf_description as pdfDesc
-            FROM 
-                PDF_table p
-            WHERE 
-                p.claimID = @claimID;
-        `;
-        const pdfResult = await pool.request()
-            .input('claimID', sql.VarChar, claimID)
-            .query(pdfQuery);
-
-        // Query to get Image details for the specified claimID, including image description
-        const imageQuery = `
-            SELECT 
+                p.pdf_description as pdfDesc,
                 i.image_url as imageURL,
                 i.image_status as imageStatus,
                 i.image_description as imageDesc
             FROM 
-                Image_table i
+                Claim_table c
+            LEFT JOIN 
+                PDF_table p ON c.claimID = p.claimID
+            LEFT JOIN 
+                Image_table i ON c.claimID = i.claimID
             WHERE 
-                i.claimID = @claimID;
+                c.claimID = @claimID;
         `;
-        const imageResult = await pool.request()
-            .input('claimID', sql.VarChar, claimID)
-            .query(imageQuery);
 
-        // Combine the results
+        const result = await pool.request()
+            .input('claimID', sql.VarChar, claim_id)
+            .query(query);
+
+        if (result.recordset.length === 0) {
+            return { message: `No claims found for claimID: ${claim_id}` };
+        }
+
+        // Grouping PDF and image details
         const claimDetails = {
-            id: claimID,
-            pdfURL: pdfResult.recordset.length > 0 ? pdfResult.recordset[0].pdfURL : null,
-            pdfDesc: pdfResult.recordset.length > 0 ? pdfResult.recordset[0].pdfDesc : null,
-            imageURL: imageResult.recordset.map(row => row.imageURL),
-            imageStatus: imageResult.recordset.map(row => row.imageStatus),
-            imageDesc: imageResult.recordset.map(row => row.imageDesc)  // Include image descriptions
+            id: result.recordset[0].id,
+            aiStatus:result.recordset[0].aiStatus,
+            pdf: result.recordset[0].pdfURL ? {
+                url: result.recordset[0].pdfURL,
+                description: result.recordset[0].pdfDesc
+            } : null,
+            images: result.recordset.filter(row => row.imageURL).map(row => ({
+                url: row.imageURL,
+                status: row.imageStatus,
+                description: row.imageDesc
+            }))
         };
 
-        console.log("claimDetails ", claimDetails);
+        // console.log("claimDetails:", claimDetails);
 
-        // Return the combined claim details
         return claimDetails;
+
     } catch (error) {
         console.error('Error fetching claims:', error.message);
         throw new Error('Error fetching claims.');
     }
 };
 
+
 // Function to get all claim IDs
 const getClaimIDs = async () => {
     try {
         const pool = await poolPromise; // Await the pool promise
         const query = `
-            SELECT DISTINCT claimID as id
+            SELECT DISTINCT claimID as id, ai_status as AiStatus
             FROM Claim_table;
         `;
 
@@ -89,7 +73,8 @@ const getClaimIDs = async () => {
 
         // Format the results into the desired JSON structure
         const claimIDs = result.recordset.map(row => ({
-            id: row.id
+            id: row.id,
+            aiStatus: row.AiStatus
         }));
 
         // Return claimIDs if not empty, otherwise return a message

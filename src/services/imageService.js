@@ -5,18 +5,18 @@ const { getPDFDescription, getImageDescriptions } = require('../util/dbQueries')
 
 
 const extractExifData = (buffer, claimDate) => {
-  const tags = ExifReader.load(buffer);
-  const dateTimeExif = tags["DateTime"]?.description;
-  const formattedDate = dateTimeExif ? formatDate(dateTimeExif.split(" ")[0]) : "Date not found";
+    const tags = ExifReader.load(buffer);
+    const dateTimeExif = tags["DateTime"]?.description;
+    const formattedDate = dateTimeExif ? formatDate(dateTimeExif.split(" ")[0]) : "Date not found";
 
-  const validationMessage = isValidClaimDate(
-    new Date(formattedDate),
-    new Date(claimDate)
-  )
-    ? "Valid Evidence"
-    : "Please upload images that are taken recently";
+    const validationMessage = isValidClaimDate(
+        new Date(formattedDate),
+        new Date(claimDate)
+    )
+        ? "Valid Evidence"
+        : "Please upload images that are taken recently";
 
-  return { formattedDate, validationMessage };
+    return { formattedDate, validationMessage };
 };
 
 const analyzeImageContent = async (imageBuffer, itemCovered) => {
@@ -34,11 +34,17 @@ const analyzeImageContent = async (imageBuffer, itemCovered) => {
                         },
                     },
                     {
-                        text: `Analyze the image and tell me what object it contains. I will also give you an object name to check for a match. Please provide the output in the JSON format for easy accessing and slicing:
-                              "ObjectName": "Expected object name",
-                              "AnalyzedImageDescription": "A brief description of what the image contains. Like what objects are there in the image given to you irrespective to itemcovered",
-                              "MatchingPercentage": "Matching percentage as a number without the % symbol"
-                          The object name to check is ${itemCovered}.`,
+                        text: `Analyze the image and get the following data. The object name to check is ${itemCovered}.,
+                        1. The Date of image clicked from the meta data,
+                        2. The Object Name for matching it with the given context
+                        3. Compare the images and given context if more than 80% of the given images supports the context then the claim status can be Approved else if it is between 50% to 80% then it has to pending and less than 50% has to be rejected.
+                        I will also give you an object name to check for a match. Now provide the output in the JSON format for easy accessing and slicing:
+                            "MatchingPercentage": "Matching percentage as a number without the % symbol"
+                            "ImageStatus":"I want a one word answer here where the one word can be ["Accepted", "Metadata not found", "Invalid Metadata", "Evidence not matching claim"] 
+                                Accepted if the matching percentage is greater than 80, if the metadata is not found then return  
+                                'Metadata is not found', if date provided in the metadata of the image is not within 30days of metadata provided in the pdf as claim Date then return 
+                                'Date issue' and if the given image is not relevant to the claim description then return 'Evidence not matching claim' "
+                            "AnalyzedImageDescription": "A brief description of why the given image is given that particular percentage",`
                     },
                 ],
             },
@@ -72,9 +78,9 @@ const analyzeImageContent = async (imageBuffer, itemCovered) => {
         let parsedJson;
         try {
             parsedJson = JSON.parse(rawContent);
-            console.log("Parsed JSON Content:", parsedJson);
+            // console.log("Parsed JSON Content:", parsedJson);
         } catch (error) {
-            throw new Error("The API response is not valid JSON.");
+            throw new Error("The API response is not valid JSON." + error);
         }
 
         const matchPercent = parsedJson['MatchingPercentage'];
@@ -92,19 +98,19 @@ const analyzeImageContent = async (imageBuffer, itemCovered) => {
             };
         }
 
+
         return {
-            "Damaged Component": parsedJson["ObjectName"],
             "Evidence Content": parsedJson["AnalyzedImageDescription"] || parsedJson["AnalyzedImage Description"] || parsedJson[" AnalyzedImageDescription"],
             "Matching percentage": matchingPercentage,
             "Evidence Relevance": matchingPercentage > 80 ? "Relevant" : "Irrelevant",
-            "Claim Status": claimStatus,
+            "Claim Status": claimStatus.status,
         };
     } catch (error) {
-        console.error("Error analyzing image content:", error.message);
+        console.error("Error analyzing image content:", error);
         throw error;
     }
 };
-  
+
 const aiSuggestion = async (claimID) => {
     try {
         // Get PDF description
@@ -148,9 +154,12 @@ const aiSuggestion = async (claimID) => {
 
         // Process the API response
         const aiSuggestionResult = response.data;
-        const suggestion = aiSuggestionResult.suggestion; // Adjust based on actual response structure
+        console.log(response.data);
+
 
         // Return AI suggestion result
+        const suggestion = aiSuggestionResult; // Adjust based on actual response structure
+
         return {
             claimID: claimID,
             aiSuggestion: suggestion

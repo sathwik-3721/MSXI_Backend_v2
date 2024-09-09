@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const pdfRoutes = require('./src/routes/pdfRoutes');
 const imageRoutes = require('./src/routes/imageRoutes');
 const folderRoutes = require('./src/routes/folderRoutes');
 const getClaims = require('./src/routes/claimRoutes');
@@ -16,7 +15,6 @@ app.use(cors());
 // app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // import routes
-app.use('/pdf', pdfRoutes);
 app.use('/image', imageRoutes);
 app.use('/delete', folderRoutes);
 app.use('/claim', getClaims)
