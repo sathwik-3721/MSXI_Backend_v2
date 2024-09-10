@@ -19,6 +19,6 @@ app.use('/image', imageRoutes);
 app.use('/delete', folderRoutes);
 app.use('/claim', getClaims)
 
-app.listen(3002, "0.0.0.0", () => {
-    console.log(`Server is running on http://0.0.0.0:3002`);
+app.listen(3002, () => {
+    console.log(`Server is running on port 3002`);
 });

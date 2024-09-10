@@ -1,6 +1,6 @@
 const express = require("express");
 const { processClaimDocuments } = require("../controllers/imageController");
-const upload = require("../middleware/upload");
+const upload = require("../moddleware/upload");
 
 const router = express.Router();
 
