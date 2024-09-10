@@ -19,9 +19,11 @@ const extractExifData = (buffer, claimDate) => {
   return { formattedDate, validationMessage };
 };
 
-const analyzeImageContent = async (imageBuffer, itemCovered) => {
+const analyzeImageContent = async (imageBuffer, itemCovered, imageMetadataArray) => {
     try {
         const mimeType = "image/jpeg";
+        const imgMetadataArray = imageMetadataArray;
+        console.log("imgMetadataArray ", imgMetadataArray);
 
         const data = JSON.stringify({
             contents: {
@@ -34,11 +36,13 @@ const analyzeImageContent = async (imageBuffer, itemCovered) => {
                         },
                     },
                     {
-                        text: `Analyze the image and tell me what object it contains. I will also give you an object name to check for a match. Please provide the output in the JSON format for easy accessing and slicing:
+                        text: `Analyze the image and tell me what object it contains. I will also give you an object name along with the image Metadata to check for a match. Please provide the output in the JSON format for easy accessing and slicing:
                               "ObjectName": "Expected object name",
+                              "RelevanceOrNot": "Analyze both the Object given and image description. If both are related to each other, then return Approved, else Not Approved"
                               "AnalyzedImageDescription": "A brief description of what the image contains. Like what objects are there in the image given to you irrespective to itemcovered",
                               "MatchingPercentage": "Matching percentage as a number without the % symbol"
-                          The object name to check is ${itemCovered}.`,
+                          The object name to check is ${itemCovered}.
+                          Metadata of the image is ${imgMetadataArray}`,
                     },
                 ],
             },
@@ -115,10 +119,13 @@ const aiSuggestion = async (claimID) => {
         const imageDescriptions = await getImageDescriptions(claimID);
         console.log("imagedescriptions", imageDescriptions);
 
+        // Access the 'recordset' array
+        const recordset = imageDescriptions.recordset;
+
         // Convert image descriptions to a formatted string
-        // const formattedImageDescriptions = imageDescriptions.map(desc => 
-        //     `Image Name: ${desc.imageName}, Description: ${desc.image_description}`
-        // ).join('\n');
+        const formattedImageDescriptions = recordset.map((desc, index) => 
+            `Image ${index + 1}: Description: ${desc.image_description}`
+        ).join('\n');
 
         // Prepare data for `miraAI` API
         const data = JSON.stringify({
@@ -128,9 +135,9 @@ const aiSuggestion = async (claimID) => {
                     {
                         text: `You are an expert in analyzing the given PDF description and image descriptions.
                                Your task is to analyze the given PDF description and image descriptions and provide a result in the format below.
-                               AI Suggestion: Accept, Reject, or Pending (if further evidence is needed)
+                               AI Suggestion: Accept, Reject, or Pending (if further evidence is needed). Give me in JSON format for easy accessing.
                                PDF Description is: ${pdfDescription}
-                               Image Descriptions: ${imageDescriptions}`
+                               Image Descriptions: ${formattedImageDescriptions}`
                     }
                 ]
             }
@@ -150,11 +157,17 @@ const aiSuggestion = async (claimID) => {
 
         // Send request to `miraAI` API
         const response = await axios.request(config);
+        console.log("Ai suggestion result ", response.data);
 
         // Process the API response
         const aiSuggestionResult = response.data;
-        const suggestion = aiSuggestionResult.suggestion; // Adjust based on actual response structure
 
+        // Extract the 'AI Suggestion' part from the response message content
+        const aiSuggestionContent = aiSuggestionResult.message.content;
+
+        // Parse the content to extract the AI suggestion from the JSON-like string
+        const aiSuggestionMatch = aiSuggestionContent.match(/"AI Suggestion":\s*"([^"]+)"/);
+        const suggestion = aiSuggestionMatch ? aiSuggestionMatch[1] : undefined;
         // Return AI suggestion result
         return {
             claimID: claimID,

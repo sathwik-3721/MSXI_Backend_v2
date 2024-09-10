@@ -1,4 +1,4 @@
-const { extractExifData, analyzeImageContent } = require("../services/imageService");
+const { extractExifData, analyzeImageContent, aiSuggestion } = require("../services/imageService");
 const { extractText, analyzeText } = require("../services/pdfService");
 const { getClaimDetails } = require("./pdfController");
 const { Storage } = require('@google-cloud/storage');
@@ -161,7 +161,7 @@ const processClaimDocuments = async (req, res) => {
                 // Step 4: Analyze image content using the claim details from the PDF
                 const analysisResults = [];
                 for (const imageMetadata of imageMetadataArray) {
-                    const analysisResult = await analyzeImageContent(imageMetadata.imageBuffer, itemCovered);
+                    const analysisResult = await analyzeImageContent(imageMetadata.imageBuffer, itemCovered, imageMetadataArray);
                     analysisResults.push({
                         imageName: imageMetadata.imageName,
                         analysisResult,
@@ -187,6 +187,9 @@ const processClaimDocuments = async (req, res) => {
                 };
 
                 console.log("Processing completed for Claim ID:", claimID);
+
+                const aiSuggestionResult = await aiSuggestion(claimID);
+                console.log("Ai suggestion", aiSuggestionResult);
 
             } catch (error) {
                 console.error("Error processing claim documents in background:", error.message);
